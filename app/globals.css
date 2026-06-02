@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink: #15201c;
+  --color-moss: #315343;
+  --color-mint: #d8f4df;
+  --color-shell: #f7f6ef;
+  --color-panel: #ffffff;
+  --color-line: #d8ded6;
+  --color-coral: #e36b52;
+  --color-sky: #b8dcf2;
+  --color-gold: #f4c76b;
+  --shadow-soft: 0 18px 50px rgba(28, 45, 37, 0.10);
+}
+
+:root {
+  color-scheme: light;
+  background: #f7f6ef;
+  color: #15201c;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-ink: #eef7f2;
+  --color-moss: #9ac5ad;
+  --color-mint: #1f4032;
+  --color-shell: #0f1513;
+  --color-panel: #17211e;
+  --color-line: #2c3b35;
+  --color-coral: #f08067;
+  --color-sky: #31586d;
+  --color-gold: #e5b95f;
+  --shadow-soft: 0 18px 50px rgba(0, 0, 0, 0.28);
+  background: #0f1513;
+  color: #eef7f2;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    linear-gradient(90deg, rgba(21, 32, 28, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(21, 32, 28, 0.05) 1px, transparent 1px),
+    #f7f6ef;
+  background-size: 38px 38px;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+:root[data-theme="dark"] body {
+  background:
+    linear-gradient(90deg, rgba(238, 247, 242, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(238, 247, 242, 0.06) 1px, transparent 1px),
+    #0f1513;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
