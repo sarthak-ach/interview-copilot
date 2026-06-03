@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   FileText,
   Mic,
@@ -7,10 +7,12 @@ import {
   TrendingUp,
   Award,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Loader2
 } from "lucide-react";
 import { DashboardCards } from "./DashboardCards";
 import { useAuth } from "./AuthContext";
+import { useResumeStore } from "@/lib/resumeStore";
 
 type DashboardViewProps = {
   onNavigate: (tab: string) => void;
@@ -18,6 +20,26 @@ type DashboardViewProps = {
 
 export function DashboardView({ onNavigate }: DashboardViewProps) {
   const { user } = useAuth();
+  const {
+    resumes,
+    activeReview,
+    isLoadingList,
+    isLoadingReview,
+    fetchResumes
+  } = useResumeStore();
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchResumes(user.id);
+    }
+  }, [user?.id]);
+
+  const getATSScoreCategory = (score: number) => {
+    if (score >= 80) return "Excellent";
+    if (score >= 60) return "Good";
+    if (score >= 40) return "Fair";
+    return "Needs Work";
+  };
 
   return (
     <div className="space-y-6">
@@ -52,61 +74,140 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       {/* Main Content Splitting */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Quick Resume Audit Summary */}
-        <div className="rounded-xl border border-line bg-panel p-5 shadow-soft hover:shadow-md transition">
-          <div className="flex items-center justify-between border-b border-line pb-4">
-            <div className="flex items-center gap-2">
-              <div className="grid size-9 place-items-center rounded-lg bg-sky/20 text-sky">
-                <FileText size={18} className="text-ink" />
+        {isLoadingList || isLoadingReview ? (
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-soft hover:shadow-md transition">
+            <div className="flex items-center justify-between border-b border-line pb-4">
+              <div className="flex items-center gap-2">
+                <div className="grid size-9 place-items-center rounded-lg bg-sky/20 text-sky">
+                  <FileText size={18} className="text-ink" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-ink">Resume Audit Summary</h4>
+                  <p className="text-xs text-ink/60">Loading...</p>
+                </div>
               </div>
-              <div>
-                <h4 className="font-semibold text-ink">Resume Audit Summary</h4>
-                <p className="text-xs text-ink/60">Updated 2 hours ago</p>
-              </div>
+              <button
+                onClick={() => onNavigate("Resume Analyzer")}
+                className="text-xs font-semibold text-moss hover:underline flex items-center gap-1"
+                type="button"
+              >
+                Analyze
+                <ArrowRight size={12} />
+              </button>
             </div>
-            <button
-              onClick={() => onNavigate("Resume Analyzer")}
-              className="text-xs font-semibold text-moss hover:underline flex items-center gap-1"
-              type="button"
-            >
-              Analyze
-              <ArrowRight size={12} />
-            </button>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-ink">Sarthak_Resume_FullStack.pdf</p>
-                <p className="text-xs text-ink/50">ATS Match Score: Excellent</p>
-              </div>
-              <span className="rounded-full bg-mint px-2.5 py-0.5 text-xs font-bold text-moss">82%</span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-ink/70">ATS Keywords Matching</span>
-                <span className="font-semibold">74%</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-ink/10">
-                <div className="h-full rounded-full bg-moss" style={{ width: "74%" }} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span className="text-ink/70">Project Impact Depth</span>
-                <span className="font-semibold">88%</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-ink/10">
-                <div className="h-full rounded-full bg-coral" style={{ width: "88%" }} />
-              </div>
-            </div>
-
-            <div className="rounded-lg bg-shell/80 p-3 text-xs text-ink/75 border border-line/60">
-              <span className="font-semibold text-moss">AI Suggestion:</span> Add missing keywords like <strong className="text-coral">Kafka</strong> and <strong className="text-coral">Redis cache strategy</strong> to boost score to 90%+.
+            <div className="mt-5 flex flex-col items-center justify-center py-8">
+              <Loader2 className="size-8 animate-spin text-moss" />
+              <p className="text-xs text-ink/50 mt-2">Retrieving resume profile...</p>
             </div>
           </div>
-        </div>
+        ) : resumes.length === 0 || !activeReview ? (
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-soft hover:shadow-md transition">
+            <div className="flex items-center justify-between border-b border-line pb-4">
+              <div className="flex items-center gap-2">
+                <div className="grid size-9 place-items-center rounded-lg bg-sky/20 text-sky">
+                  <FileText size={18} className="text-ink" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-ink">Resume Audit Summary</h4>
+                  <p className="text-xs text-ink/60">No resume analyzed yet</p>
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigate("Resume Analyzer")}
+                className="text-xs font-semibold text-moss hover:underline flex items-center gap-1"
+                type="button"
+              >
+                Analyze
+                <ArrowRight size={12} />
+              </button>
+            </div>
+            <div className="mt-5 space-y-4 text-center py-4">
+              <p className="text-xs text-ink/60">Upload your resume to get AI-powered ATS keyword matching, project impact depth, and optimization rewrites.</p>
+              <button
+                onClick={() => onNavigate("Resume Analyzer")}
+                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-moss px-4 text-xs font-semibold text-shell hover:bg-ink transition hover:scale-[1.02]"
+                type="button"
+              >
+                Upload Resume
+                <ArrowRight size={14} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-line bg-panel p-5 shadow-soft hover:shadow-md transition">
+            <div className="flex items-center justify-between border-b border-line pb-4">
+              <div className="flex items-center gap-2">
+                <div className="grid size-9 place-items-center rounded-lg bg-sky/20 text-sky">
+                  <FileText size={18} className="text-ink" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-ink">Resume Audit Summary</h4>
+                  <p className="text-xs text-ink/60">Active profile review</p>
+                </div>
+              </div>
+              <button
+                onClick={() => onNavigate("Resume Analyzer")}
+                className="text-xs font-semibold text-moss hover:underline flex items-center gap-1"
+                type="button"
+              >
+                View Full Review
+                <ArrowRight size={12} />
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-ink truncate max-w-[200px]" title={activeReview.filename}>
+                    {activeReview.filename}
+                  </p>
+                  <p className="text-xs text-ink/50">ATS Match Score: {getATSScoreCategory(activeReview.score)}</p>
+                </div>
+                <span className="rounded-full bg-mint px-2.5 py-0.5 text-xs font-bold text-moss">
+                  {activeReview.score}%
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-ink/70">ATS Keywords Matching</span>
+                  <span className="font-semibold">{activeReview.atsKeywords}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-ink/10">
+                  <div className="h-full rounded-full bg-moss transition-all duration-500" style={{ width: `${activeReview.atsKeywords}%` }} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="text-ink/70">Project Impact Depth</span>
+                  <span className="font-semibold">{activeReview.projectImpact}%</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-ink/10">
+                  <div className="h-full rounded-full bg-coral transition-all duration-500" style={{ width: `${activeReview.projectImpact}%` }} />
+                </div>
+              </div>
+
+              <div className="rounded-lg bg-shell/80 p-3 text-xs text-ink/75 border border-line/60">
+                <span className="font-semibold text-moss">AI Suggestion: </span>
+                {activeReview.missingKeywords && activeReview.missingKeywords.length > 0 ? (
+                  <>
+                    Add missing keywords like{" "}
+                    {activeReview.missingKeywords.slice(0, 3).map((keyword, index, array) => (
+                      <span key={keyword}>
+                        <strong className="text-coral">{keyword}</strong>
+                        {index < array.length - 1 ? (index === array.length - 2 ? " and " : ", ") : ""}
+                      </span>
+                    ))}
+                    {" "}to boost your score.
+                  </>
+                ) : (
+                  "Excellent work! Your resume contains a robust keyword profile. Tailor bullets in the optimizer for specific job targets."
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Mock Interview Launchpad */}
         <div className="rounded-xl border border-line bg-panel p-5 shadow-soft hover:shadow-md transition">

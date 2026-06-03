@@ -1,4 +1,4 @@
-import { LogOut, Moon, Play, Sun } from "lucide-react";
+import { LogOut, Moon, Sun } from "lucide-react";
 import { useAuth } from "./AuthContext";
 
 type TopbarProps = {
@@ -53,11 +53,6 @@ export function Topbar({ theme, onThemeToggle }: TopbarProps) {
               </button>
             </div>
           )}
-
-          <button className="flex h-10 items-center gap-2 rounded-lg bg-coral px-4 text-sm font-semibold text-white cursor-pointer" type="button">
-            <Play size={17} />
-            Demo Flow
-          </button>
         </div>
       </div>
     </header>

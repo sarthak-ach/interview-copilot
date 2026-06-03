@@ -2,6 +2,8 @@ package com.interviewcopilot.jobs;
 
 import com.interviewcopilot.resumes.Resume;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.util.UUID;
 
 @Entity
@@ -26,6 +28,7 @@ public class JobMatch {
     @Column(name = "match_score", nullable = false)
     private Integer matchScore;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "analysis_json", columnDefinition = "jsonb")
     private String analysisJson;
 

@@ -1,6 +1,8 @@
 package com.interviewcopilot.resumes;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.util.UUID;
 
 @Entity
@@ -20,6 +22,7 @@ public class ResumeReview {
     @Column(nullable = false)
     private Integer score;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "review_json", columnDefinition = "jsonb")
     private String reviewJson;
 

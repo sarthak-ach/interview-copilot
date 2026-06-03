@@ -67,6 +67,7 @@ next-env.d.ts
 .classpath
 .project
 .factorypath
+/backend/uploads/
 
 # OS files
 Thumbs.db

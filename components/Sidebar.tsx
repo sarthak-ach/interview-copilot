@@ -1,4 +1,4 @@
-import { Bot, Check, ShieldCheck, type LucideIcon } from "lucide-react";
+import { Bot, type LucideIcon } from "lucide-react";
 
 type SidebarProps = {
   activeTab: string;
@@ -37,24 +37,6 @@ export function Sidebar({ activeTab, modules, onTabChange }: SidebarProps) {
           </button>
         ))}
       </nav>
-
-      <div className="mt-8 rounded-lg border border-line bg-panel p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <ShieldCheck size={18} className="text-moss" />
-          Portfolio Signals
-        </div>
-        <div className="mt-4 space-y-3 text-sm text-ink/72">
-          <p className="flex items-center gap-2">
-            <Check size={16} className="text-moss" /> Next.js 16 UI
-          </p>
-          <p className="flex items-center gap-2">
-            <Check size={16} className="text-moss" /> Spring Boot APIs
-          </p>
-          <p className="flex items-center gap-2">
-            <Check size={16} className="text-moss" /> Auth, Redis, PostgreSQL
-          </p>
-        </div>
-      </div>
     </aside>
   );
 }
