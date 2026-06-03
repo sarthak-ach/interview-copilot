@@ -34,3 +34,42 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# ==========================================
+# Backend (Java & Maven) exclusions
+# ==========================================
+**/target/
+*.class
+
+# Log files
+*.log
+**/logs/
+
+# Package files
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+
+# Portable Maven bootstrap tool folder
+/backend/maven/
+
+# ==========================================
+# IDE and Editor exclusions
+# ==========================================
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# OS files
+Thumbs.db
+desktop.ini
+.DS_Store
+

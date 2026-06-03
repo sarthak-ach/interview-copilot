@@ -13,12 +13,17 @@ import {
   Sun,
   Zap
 } from "lucide-react";
-import { ApplicationPipeline } from "@/components/ApplicationPipeline";
-import { DashboardCards } from "@/components/DashboardCards";
-import { InterviewChatPreview } from "@/components/InterviewChatPreview";
-import { ResumeAnalyzerPreview } from "@/components/ResumeAnalyzerPreview";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthContext";
+import { Loader2 } from "lucide-react";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
+import { DashboardView } from "@/components/DashboardView";
+import { ResumeAnalyzerView } from "@/components/ResumeAnalyzerView";
+import { JobMatchView } from "@/components/JobMatchView";
+import { MockInterviewView } from "@/components/MockInterviewView";
+import { SystemDesignView } from "@/components/SystemDesignView";
+import { JobTrackerView } from "@/components/JobTrackerView";
 
 const modules = [
   { label: "Dashboard", icon: LayoutDashboard },
@@ -37,32 +42,34 @@ const tabContent: Record<string, { title: string; description: string; stats: st
   },
   "Resume Analyzer": {
     title: "Resume Analyzer",
-    description: "Dummy workspace for uploaded resumes, ATS scoring, and project impact feedback.",
-    stats: ["Latest upload: pending", "Keyword gaps: 7", "Rewrite suggestions: 12"]
+    description: "Upload resumes, scan keyword alignment, and get AI bullet optimization suggestions.",
+    stats: ["Latest score: 82%", "Keyword gaps: 5", "Rewrite recommendations: 2"]
   },
   "Job Match": {
     title: "Job Match",
-    description: "Dummy content for comparing a resume against a pasted job description.",
-    stats: ["Match score: 76%", "Strong signals: 9", "Missing skills: 3"]
+    description: "Compare your resume against pasted job descriptions to inspect skills matching.",
+    stats: ["Stripe match: 84%", "Netflix match: 68%", "Custom match: ready"]
   },
   "Mock Interview": {
     title: "Mock Interview",
-    description: "Dummy practice area for AI-led technical rounds and scored answers.",
-    stats: ["Track: Spring Boot", "Last score: 8.1", "Questions queued: 10"]
+    description: "Conduct technical rounds with our interactive chatbot and get instant scorecards.",
+    stats: ["Spring Boot score: 8.4", "Difficulty: Senior", "Mock interview passes: 1"]
   },
   "System Design": {
     title: "System Design",
-    description: "Dummy canvas for requirements, capacity estimates, APIs, and scaling notes.",
-    stats: ["Challenge: Design YouTube", "Sections ready: 4", "Follow-ups: 6"]
+    description: "Practice core database scaling, capacity, and API design checkpoints with AI hints.",
+    stats: ["YouTube draft: ready", "WhatsApp draft: ready", "Design evaluations: 82%"]
   },
   "Job Tracker": {
     title: "Job Tracker",
-    description: "Dummy pipeline for saved companies, interviews, and next actions.",
-    stats: ["Active jobs: 12", "Interviews: 3", "Follow-ups due: 2"]
+    description: "Organize applications and monitor pipeline stages with an interactive Kanban board.",
+    stats: ["Total jobs tracked: 4", "Active interviews: 2", "Applications: 1"]
   }
 };
 
 export default function Home() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState(modules[0].label);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const currentTab = tabContent[activeTab];
@@ -75,6 +82,12 @@ export default function Home() {
     window.requestAnimationFrame(() => setTheme(initialTheme));
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push("/login");
+    }
+  }, [isAuthenticated, isLoading, router]);
+
   function toggleTheme() {
     const nextTheme = theme === "dark" ? "light" : "dark";
 
@@ -83,15 +96,30 @@ export default function Home() {
     window.localStorage.setItem("interview-copilot-theme", nextTheme);
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-shell">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="animate-spin text-moss" size={36} />
+          <p className="text-sm font-semibold text-moss">Loading workspace...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
+
   return (
     <main className="min-h-screen text-ink">
       <div className="mx-auto flex min-h-screen w-full max-w-[1500px]">
         <Sidebar activeTab={activeTab} modules={modules} onTabChange={setActiveTab} />
 
-        <section className="flex-1 px-4 py-4 sm:px-6 lg:px-8">
+        <section className="flex-grow px-4 py-4 sm:px-6 lg:px-8 flex flex-col min-w-0">
           <Topbar theme={theme} onThemeToggle={toggleTheme} />
 
-          <div className="pt-5">
+          <div className="pt-5 lg:hidden">
             <div className="flex gap-2 overflow-x-auto rounded-lg border border-line bg-panel/70 p-2 shadow-soft hide-scrollbar">
               {modules.map((item) => (
                 <button
@@ -107,80 +135,17 @@ export default function Home() {
                 </button>
               ))}
             </div>
-
-            <section className="mt-5 rounded-lg border border-line bg-panel p-5 shadow-soft">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-moss">Active tab</p>
-                  <h2 className="mt-1 text-2xl font-semibold">{currentTab.title}</h2>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-ink/66">{currentTab.description}</p>
-                </div>
-                <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[520px]">
-                  {currentTab.stats.map((stat) => (
-                    <div key={stat} className="rounded-lg border border-line bg-shell px-3 py-3 text-sm font-semibold text-ink/78">
-                      {stat}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
           </div>
 
-          <div className="grid gap-5 py-5 xl:grid-cols-[1.45fr_0.95fr]">
-            <section className="space-y-5">
-              <ResumeAnalyzerPreview />
-              <DashboardCards />
-            </section>
-
-            <aside className="space-y-5">
-              <InterviewChatPreview />
-              <ApplicationPipeline />
-
-              <div className="rounded-lg border border-line bg-ink p-5 text-shell shadow-soft">
-                <div className="flex items-center gap-2">
-                  <Zap size={20} className="text-gold" />
-                  <h3 className="text-lg font-semibold">Backend Preview</h3>
-                </div>
-                <div className="mt-4 grid gap-3 text-sm text-shell/76">
-                  <p className="flex items-center justify-between gap-3">
-                    Auth API <span className="rounded-lg bg-white/10 px-2 py-1">JWT</span>
-                  </p>
-                  <p className="flex items-center justify-between gap-3">
-                    Resume AI <span className="rounded-lg bg-white/10 px-2 py-1">Async</span>
-                  </p>
-                  <p className="flex items-center justify-between gap-3">
-                    Provider <span className="rounded-lg bg-white/10 px-2 py-1">OpenAI/Ollama</span>
-                  </p>
-                </div>
-              </div>
-            </aside>
+          <div className="py-5 flex-1 flex flex-col min-w-0">
+            {activeTab === "Dashboard" && <DashboardView onNavigate={setActiveTab} />}
+            {activeTab === "Resume Analyzer" && <ResumeAnalyzerView />}
+            {activeTab === "Job Match" && <JobMatchView />}
+            {activeTab === "Mock Interview" && <MockInterviewView />}
+            {activeTab === "System Design" && <SystemDesignView />}
+            {activeTab === "Job Tracker" && <JobTrackerView />}
           </div>
         </section>
-      </div>
-
-      <div className="fixed bottom-4 left-4 right-4 z-30 flex items-center justify-between gap-3 rounded-lg border border-line bg-panel/95 p-3 shadow-soft backdrop-blur lg:hidden">
-        <select
-          className="h-10 min-w-0 flex-1 rounded-lg border border-line bg-shell px-3 text-sm font-semibold"
-          value={activeTab}
-          onChange={(event) => setActiveTab(event.target.value)}
-        >
-          {modules.map((item) => (
-            <option key={item.label} value={item.label}>
-              {item.label}
-            </option>
-          ))}
-        </select>
-        <button
-          className="grid size-10 place-items-center rounded-lg border border-line bg-shell text-ink"
-          type="button"
-          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          onClick={toggleTheme}
-        >
-          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-        <button className="grid size-10 place-items-center rounded-lg bg-ink text-shell" type="button" aria-label="Open mobile menu">
-          <ChevronDown size={18} />
-        </button>
       </div>
     </main>
   );
