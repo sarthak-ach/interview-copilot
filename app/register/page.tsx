@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthContext";
 import { Bot, Mail, Lock, User, Eye, EyeOff, ArrowRight, AlertCircle, Loader2, Sun, Moon } from "lucide-react";
+import GoogleLoginButton from "@/components/GoogleLoginButton";
 
 export default function RegisterPage() {
   const { register, isAuthenticated, isLoading } = useAuth();
@@ -238,6 +239,16 @@ export default function RegisterPage() {
               )}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-line/60"></div>
+            <span className="flex-shrink mx-4 text-xs font-bold uppercase tracking-wider text-ink/35">Or continue with</span>
+            <div className="flex-grow border-t border-line/60"></div>
+          </div>
+
+          {/* Google Login Button */}
+          <GoogleLoginButton />
 
           {/* Prompt to login */}
           <div className="mt-6 text-center border-t border-line/60 pt-4">

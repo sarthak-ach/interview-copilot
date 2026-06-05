@@ -17,11 +17,14 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash", nullable = true)
     private String passwordHash;
 
     @Column(name = "full_name", nullable = false)
     private String fullName;
+
+    @Column(name = "auth_provider", nullable = false, columnDefinition = "VARCHAR(255) DEFAULT 'LOCAL'")
+    private String authProvider = "LOCAL";
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -29,11 +32,12 @@ public class User {
     public User() {
     }
 
-    public User(UUID id, String email, String passwordHash, String fullName, LocalDateTime createdAt) {
+    public User(UUID id, String email, String passwordHash, String fullName, String authProvider, LocalDateTime createdAt) {
         this.id = id;
         this.email = email;
         this.passwordHash = passwordHash;
         this.fullName = fullName;
+        this.authProvider = authProvider;
         this.createdAt = createdAt;
     }
 
@@ -54,6 +58,9 @@ public class User {
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getAuthProvider() { return authProvider; }
+    public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

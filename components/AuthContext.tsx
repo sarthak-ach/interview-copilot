@@ -16,6 +16,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (fullName: string, email: string, password: string) => Promise<void>;
+  loginWithGoogle: (credential: string, isMock?: boolean, email?: string, fullName?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -136,6 +137,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (credential: string, isMock = false, email?: string, fullName?: string) => {
+    setIsLoading(true);
+    try {
+      const response = await apiFetch<{
+        access_token: string;
+        refresh_token: string;
+        email: string;
+        fullName: string;
+      }>("/api/auth/google", {
+        method: "POST",
+        bodyData: { credential, isMock, email, fullName },
+      });
+
+      localStorage.setItem("interview-copilot-token", response.access_token);
+      localStorage.setItem("interview-copilot-refresh-token", response.refresh_token);
+      
+      setToken(response.access_token);
+      setUser({
+        id: "",
+        email: response.email,
+        fullName: response.fullName,
+      });
+
+      try {
+        const profile = await apiFetch<User>("/api/users/me");
+        setUser(profile);
+      } catch (err) {
+        // Fallback
+      }
+    } catch (error) {
+      logout();
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     localStorage.removeItem("interview-copilot-token");
     localStorage.removeItem("interview-copilot-refresh-token");
@@ -152,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         login,
         register,
+        loginWithGoogle,
         logout,
       }}
     >
