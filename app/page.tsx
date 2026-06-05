@@ -11,7 +11,8 @@ import {
   Network,
   Search,
   Sun,
-  Zap
+  Zap,
+  Code
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthContext";
@@ -24,6 +25,7 @@ import { JobMatchView } from "@/components/JobMatchView";
 import { MockInterviewView } from "@/components/MockInterviewView";
 import { SystemDesignView } from "@/components/SystemDesignView";
 import { JobTrackerView } from "@/components/JobTrackerView";
+import { CodeEditorView } from "@/components/CodeEditorView";
 
 const modules = [
   { label: "Dashboard", icon: LayoutDashboard },
@@ -31,6 +33,7 @@ const modules = [
   { label: "Job Match", icon: Search },
   { label: "Mock Interview", icon: Mic },
   { label: "System Design", icon: Network },
+  { label: "Code Editor", icon: Code },
   { label: "Job Tracker", icon: Briefcase }
 ];
 
@@ -64,6 +67,11 @@ const tabContent: Record<string, { title: string; description: string; stats: st
     title: "Job Tracker",
     description: "Organize applications and monitor pipeline stages with an interactive Kanban board.",
     stats: ["Total jobs tracked: 4", "Active interviews: 2", "Applications: 1"]
+  },
+  "Code Editor": {
+    title: "Code Editor",
+    description: "Write and evaluate Java and JavaScript solutions for coding challenges with real-time draft saving.",
+    stats: ["Solved: 3", "Languages: Java, JS", "Avg Score: 85%"]
   }
 };
 
@@ -143,6 +151,7 @@ export default function Home() {
             {activeTab === "Job Match" && <JobMatchView />}
             {activeTab === "Mock Interview" && <MockInterviewView />}
             {activeTab === "System Design" && <SystemDesignView />}
+            {activeTab === "Code Editor" && <CodeEditorView />}
             {activeTab === "Job Tracker" && <JobTrackerView />}
           </div>
         </section>
