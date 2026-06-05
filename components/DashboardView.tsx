@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FileText,
   Mic,
@@ -13,6 +13,7 @@ import {
 import { DashboardCards } from "./DashboardCards";
 import { useAuth } from "./AuthContext";
 import { useResumeStore } from "@/lib/resumeStore";
+import { apiFetch } from "@/lib/api";
 
 type DashboardViewProps = {
   onNavigate: (tab: string) => void;
@@ -28,9 +29,25 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     fetchResumes
   } = useResumeStore();
 
+  const [stats, setStats] = useState<any>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState<boolean>(true);
+
+  const fetchDashboardStats = async () => {
+    try {
+      setIsLoadingStats(true);
+      const data = await apiFetch<any>("/api/dashboard/stats");
+      setStats(data);
+    } catch (e) {
+      console.error("Failed to load dashboard stats:", e);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  };
+
   useEffect(() => {
     if (user?.id) {
       fetchResumes(user.id);
+      fetchDashboardStats();
     }
   }, [user?.id]);
 
@@ -69,7 +86,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       </div>
 
       {/* Primary Analytics Grid */}
-      <DashboardCards />
+      <DashboardCards stats={stats} />
 
       {/* Main Content Splitting */}
       <div className="grid gap-6 lg:grid-cols-2">
@@ -218,7 +235,9 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               </div>
               <div>
                 <h4 className="font-semibold text-ink">Interview Preparation</h4>
-                <p className="text-xs text-ink/60">Active track: Java & Spring Boot</p>
+                <p className="text-xs text-ink/60">
+                  Active track: {stats?.latestMockInterviewCategory || "None started yet"}
+                </p>
               </div>
             </div>
             <button
@@ -226,7 +245,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               className="text-xs font-semibold text-moss hover:underline flex items-center gap-1"
               type="button"
             >
-              All Sessions
+              Start Session
               <ArrowRight size={12} />
             </button>
           </div>
@@ -235,22 +254,54 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <div className="flex items-center justify-between rounded-lg bg-shell/50 p-3 border border-line/40">
               <div>
                 <p className="text-sm font-semibold text-ink">Last Mock Session</p>
-                <p className="text-xs text-ink/60">Completed on Jun 02</p>
+                <p className="text-xs text-ink/60">
+                  {stats?.latestMockInterviewCategory
+                    ? stats.latestMockInterviewDate
+                      ? `Completed on ${stats.latestMockInterviewDate}`
+                      : "In progress"
+                    : "No mock sessions yet"}
+                </p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-bold text-moss">8.1<span className="text-xs text-ink/50">/10</span></p>
-                <span className="rounded-full bg-mint px-2 py-0.5 text-[10px] font-semibold text-moss">Passed</span>
+                {stats?.latestMockInterviewCategory ? (
+                  <>
+                    <p className="text-lg font-bold text-moss">
+                      {stats.latestMockInterviewScore != null ? stats.latestMockInterviewScore : "N/A"}
+                      <span className="text-xs text-ink/50">/10</span>
+                    </p>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      stats.latestMockInterviewStatus === "Passed"
+                        ? "bg-mint text-moss"
+                        : stats.latestMockInterviewStatus === "In Progress"
+                        ? "bg-sky/20 text-ink"
+                        : "bg-coral/15 text-coral"
+                    }`}>
+                      {stats.latestMockInterviewStatus || "In Progress"}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg font-bold text-ink/40">N/A</p>
+                    <span className="rounded-full bg-shell/70 border border-line px-2 py-0.5 text-[10px] font-semibold text-ink/40">
+                      No Data
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-lg border border-line bg-shell/45 p-3 text-center">
                 <p className="text-xs text-ink/50">Questions Solved</p>
-                <p className="mt-1 text-xl font-bold text-ink">24</p>
+                <p className="mt-1 text-xl font-bold text-ink">
+                  {stats?.totalQuestionsSolved != null ? stats.totalQuestionsSolved : 0}
+                </p>
               </div>
               <div className="rounded-lg border border-line bg-shell/45 p-3 text-center">
                 <p className="text-xs text-ink/50">Total Time Practiced</p>
-                <p className="mt-1 text-xl font-bold text-ink">1.8 hrs</p>
+                <p className="mt-1 text-xl font-bold text-ink">
+                  {stats?.totalHoursPracticed != null ? `${stats.totalHoursPracticed} hrs` : "0.0 hrs"}
+                </p>
               </div>
             </div>
 
@@ -259,7 +310,11 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               className="flex w-full h-10 items-center justify-center gap-2 rounded-lg bg-moss text-shell text-sm font-semibold transition hover:bg-ink"
               type="button"
             >
-              Resume Spring Boot Practice
+              {stats?.latestMockInterviewCategory
+                ? stats.latestMockInterviewStatus === "In Progress"
+                  ? `Resume ${stats.latestMockInterviewCategory} Practice`
+                  : `Start New ${stats.latestMockInterviewCategory} Session`
+                : "Start AI Mock Interview"}
               <ArrowRight size={14} />
             </button>
           </div>

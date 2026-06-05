@@ -1,10 +1,13 @@
-import { Database, Gauge, Mic, Search, type LucideIcon } from "lucide-react";
+import { Briefcase, Mic, Search, type LucideIcon } from "lucide-react";
 
-const cards = [
-  { label: "Job Match", value: "76%", detail: "Against Senior Full Stack JD", icon: Search },
-  { label: "Mock Score", value: "8.1", detail: "Spring Boot interview session", icon: Mic },
-  { label: "Cache Hits", value: "94%", detail: "Redis-backed AI result reuse", icon: Database }
-];
+type DashboardStats = {
+  latestJobMatchScore: number | null;
+  latestJobMatchTitle: string | null;
+  latestMockInterviewScore: number | null;
+  latestMockInterviewCategory: string | null;
+  totalJobsTracked: number;
+  activeInterviews: number;
+};
 
 function StatCard({
   label,
@@ -28,12 +31,35 @@ function StatCard({
           <Icon size={22} />
         </div>
       </div>
-      <p className="mt-3 text-sm text-ink/65">{detail}</p>
+      <p className="mt-3 text-sm text-ink/65 line-clamp-1" title={detail}>{detail}</p>
     </div>
   );
 }
 
-export function DashboardCards() {
+export function DashboardCards({ stats }: { stats: DashboardStats | null }) {
+  const cards = [
+    {
+      label: "Job Match",
+      value: stats?.latestJobMatchScore != null ? `${stats.latestJobMatchScore}%` : "N/A",
+      detail: stats?.latestJobMatchTitle ? `Against ${stats.latestJobMatchTitle}` : "No matches run yet",
+      icon: Search
+    },
+    {
+      label: "Mock Score",
+      value: stats?.latestMockInterviewScore != null ? stats.latestMockInterviewScore.toFixed(1) : "N/A",
+      detail: stats?.latestMockInterviewCategory ? `${stats.latestMockInterviewCategory} practice` : "No sessions yet",
+      icon: Mic
+    },
+    {
+      label: "Jobs Tracked",
+      value: stats?.totalJobsTracked != null ? stats.totalJobsTracked.toString() : "0",
+      detail: stats?.activeInterviews != null
+        ? `${stats.activeInterviews} active interviews in pipeline`
+        : "No active interviews in pipeline",
+      icon: Briefcase
+    }
+  ];
+
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {cards.map((card) => (
