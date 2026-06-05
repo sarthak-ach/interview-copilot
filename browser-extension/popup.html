@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 340px;
+      margin: 0;
+      padding: 16px;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1510;
+      color: #e6eae7;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .container-sub {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-bottom: 1px solid #203527;
+      padding-bottom: 8px;
+    }
+    .title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #6ee7b7;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid #203527;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .label {
+      font-size: 10px;
+      font-weight: bold;
+      color: #6ee7b7;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .value {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e6eae7;
+    }
+    .desc {
+      font-size: 11px;
+      color: rgba(230, 234, 231, 0.7);
+      max-height: 80px;
+      overflow-y: auto;
+      white-space: pre-line;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 6px;
+      border-radius: 4px;
+    }
+    .btn {
+      background: #10b981;
+      border: none;
+      color: #0d1510;
+      padding: 10px;
+      border-radius: 6px;
+      font-weight: bold;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+    .btn:hover {
+      background: #34d399;
+      transform: scale(1.02);
+    }
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .input-field {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid #203527;
+      border-radius: 4px;
+      padding: 8px 10px;
+      color: #e6eae7;
+      font-size: 11px;
+      outline: none;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .input-field:focus {
+      border-color: #10b981;
+    }
+    .status {
+      font-size: 11px;
+      padding: 8px;
+      border-radius: 6px;
+      display: none;
+      word-break: break-all;
+      box-sizing: border-box;
+    }
+    .status.success {
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: #34d399;
+      display: block;
+    }
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      color: #fca5a5;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="title">Interview Copilot Clipper</span>
+      <div id="user-profile" style="display: none; align-items: center; gap: 8px;">
+        <span id="user-name" style="font-size: 11px; color: #6ee7b7; font-weight: 600; max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></span>
+        <button id="logout-btn" style="background: transparent; border: 1px solid #ef4444; color: #f87171; font-size: 10px; padding: 2px 6px; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;">Log Out</button>
+      </div>
+    </div>
+
+    <!-- Status Box -->
+    <div id="status-box" class="status"></div>
+
+    <!-- LOGIN VIEW -->
+    <div id="login-view" style="display: none;" class="card">
+      <div class="label">Sign In to Your Account</div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+        <div>
+          <div style="font-size: 9px; color: rgba(230, 234, 231, 0.6); margin-bottom: 2px; font-weight: bold; letter-spacing: 0.5px;">EMAIL</div>
+          <input type="email" id="login-email" class="input-field" placeholder="name@example.com">
+        </div>
+        <div>
+          <div style="font-size: 9px; color: rgba(230, 234, 231, 0.6); margin-bottom: 2px; font-weight: bold; letter-spacing: 0.5px;">PASSWORD</div>
+          <input type="password" id="login-password" class="input-field" placeholder="••••••••">
+        </div>
+        <button id="login-btn" class="btn" style="margin-top: 6px;">Log In</button>
+      </div>
+    </div>
+
+    <!-- DASHBOARD VIEW -->
+    <div id="dashboard-view" style="display: none;" class="container-sub">
+      <!-- Scraped Job Info -->
+      <div class="card" id="job-info">
+        <div class="label">Detected Listing</div>
+        <div class="value" id="job-title">Scrape LinkedIn page to load details.</div>
+        <div class="value" id="job-company" style="font-size: 11px; opacity: 0.8; margin-top: -4px;"></div>
+        <div class="desc" id="job-desc">Navigate to a LinkedIn job view/details page and click Scrape.</div>
+      </div>
+
+      <button id="scrape-btn" class="btn">Scrape LinkedIn Page</button>
+      <button id="save-btn" class="btn" style="background: #111827; border: 1px solid #203527; color: #6ee7b7; margin-top: 4px;" disabled>Save to Kanban Board</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
