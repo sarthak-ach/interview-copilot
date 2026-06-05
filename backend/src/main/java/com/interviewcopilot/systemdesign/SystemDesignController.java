@@ -11,6 +11,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -110,6 +111,39 @@ public class SystemDesignController {
 
         public String getScalingDraft() { return scalingDraft; }
         public void setScalingDraft(String scalingDraft) { this.scalingDraft = scalingDraft; }
+    }
+
+    @PostMapping("/sessions/evaluate-diagram")
+    public ResponseEntity<?> evaluateDiagram(@Valid @RequestBody EvaluateDiagramRequest request) {
+        User user = getAuthenticatedUser();
+        try {
+            String evaluationJson = systemDesignService.evaluateDiagram(
+                    user,
+                    request.getChallengeName(),
+                    request.getNodes(),
+                    request.getLinks()
+            );
+            return ResponseEntity.ok(objectMapper.readTree(evaluationJson));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("System design diagram evaluation failed: " + e.getMessage());
+        }
+    }
+
+    public static class EvaluateDiagramRequest {
+        @NotBlank
+        private String challengeName;
+        private List<Map<String, String>> nodes;
+        private List<Map<String, String>> links;
+
+        public String getChallengeName() { return challengeName; }
+        public void setChallengeName(String challengeName) { this.challengeName = challengeName; }
+
+        public List<Map<String, String>> getNodes() { return nodes; }
+        public void setNodes(List<Map<String, String>> nodes) { this.nodes = nodes; }
+
+        public List<Map<String, String>> getLinks() { return links; }
+        public void setLinks(List<Map<String, String>> links) { this.links = links; }
     }
 
     public static class EvaluateRequest {

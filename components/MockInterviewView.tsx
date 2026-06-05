@@ -8,7 +8,8 @@ import {
   Award,
   ChevronRight,
   RefreshCw,
-  Info
+  Info,
+  Volume2
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/components/AuthContext";
@@ -81,6 +82,12 @@ export function MockInterviewView() {
   const [evaluation, setEvaluation] = useState<any>(null);
   const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
 
+  // Audio Voice Mode states
+  const [isVoiceMode, setIsVoiceMode] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
   const activeQuestions = tracks[selectedTrack]?.questions || [];
   const activeFeedbacks = tracks[selectedTrack]?.feedbacks || [];
 
@@ -89,8 +96,103 @@ export function MockInterviewView() {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Clean up synthesis and recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  const speakText = (text: string) => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+
+    const cleanText = text.replace(/[*#`"]/g, "");
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const voices = window.speechSynthesis.getVoices();
+    const chosenVoice = voices.find(v => v.lang.startsWith("en-") && v.name.includes("Google")) || 
+                        voices.find(v => v.lang.startsWith("en-")) || 
+                        voices[0];
+    if (chosenVoice) {
+      utterance.voice = chosenVoice;
+    }
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startSpeechRecognition = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setSpeechError("Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+    }
+
+    const rec = new SpeechRecognition();
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.lang = "en-US";
+
+    rec.onstart = () => {
+      setIsListening(true);
+      setSpeechError(null);
+    };
+
+    rec.onresult = (event: any) => {
+      let finalTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
+        }
+      }
+      if (finalTranscript) {
+        setInputVal(prev => prev + (prev ? " " : "") + finalTranscript);
+      }
+    };
+
+    rec.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error !== "no-speech") {
+        setSpeechError(`Error: ${event.error}`);
+        setIsListening(false);
+      }
+    };
+
+    rec.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = rec;
+    rec.start();
+  };
+
+  const stopSpeechRecognition = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+  };
+
+  const toggleListening = () => {
+    if (isListening) {
+      stopSpeechRecognition();
+    } else {
+      startSpeechRecognition();
+    }
+  };
+
   const handleStartSession = async () => {
     setIsStarting(true);
+    setSpeechError(null);
     try {
       const data = await apiFetch("/api/interviews/start", {
         method: "POST",
@@ -102,26 +204,34 @@ export function MockInterviewView() {
         }
       });
       setSessionId(data.id);
+      const welcome = `Welcome to your mock interview on the ${selectedTrack} track at ${difficulty} level. My role is to evaluate your answers. Let's begin with the first question:\n\n"${data.firstQuestion}"`;
       setMessages([
         {
           role: "AI",
-          content: `Welcome to your mock interview on the ${selectedTrack} track at ${difficulty} level. My role is to evaluate your answers. Let's begin with the first question:\n\n"${data.firstQuestion}"`,
+          content: welcome,
           time: getFormattedTime()
         }
       ]);
+      if (isVoiceMode) {
+        speakText(welcome);
+      }
       setCurrentQuestionIndex(0);
       setSessionState("chat");
     } catch (err) {
       console.error("Failed to start session:", err);
       // Fallback local start
       setSessionId(null);
+      const welcome = `Welcome to your mock interview (offline fallback). Let's begin with the first question:\n\n"${activeQuestions[0]}"`;
       setMessages([
         {
           role: "AI",
-          content: `Welcome to your mock interview (offline fallback). Let's begin with the first question:\n\n"${activeQuestions[0]}"`,
+          content: welcome,
           time: getFormattedTime()
         }
       ]);
+      if (isVoiceMode) {
+        speakText(welcome);
+      }
       setSessionState("chat");
     } finally {
       setIsStarting(false);
@@ -134,6 +244,10 @@ export function MockInterviewView() {
 
     const userText = inputVal.trim();
     setInputVal("");
+
+    if (isListening) {
+      stopSpeechRecognition();
+    }
 
     // Append user message
     setMessages(prev => [...prev, { role: "user", content: userText, time: getFormattedTime() }]);
@@ -153,6 +267,9 @@ export function MockInterviewView() {
             time: getFormattedTime()
           }
         ]);
+        if (isVoiceMode) {
+          speakText(data.content);
+        }
         setCurrentQuestionIndex(prev => prev + 1);
       } else {
         // Fallback offline progression
@@ -162,24 +279,32 @@ export function MockInterviewView() {
           if (nextIndex < activeQuestions.length) {
             const feedback = activeFeedbacks[currentQuestionIndex];
             const nextQuestion = activeQuestions[nextIndex];
+            const welcome = `${feedback}\n\nHere is the next question:\n\n"${nextQuestion}"`;
             setMessages(prev => [
               ...prev,
               {
                 role: "AI",
-                content: `${feedback}\n\nHere is the next question:\n\n"${nextQuestion}"`,
+                content: welcome,
                 time: getFormattedTime()
               }
             ]);
+            if (isVoiceMode) {
+              speakText(welcome);
+            }
             setCurrentQuestionIndex(nextIndex);
           } else {
+            const welcome = "Excellent response! That completes all questions in this session. Click the button below to retrieve your comprehensive evaluation and scorecard.";
             setMessages(prev => [
               ...prev,
               {
                 role: "AI",
-                content: "Excellent response! That completes all questions in this session. Click the button below to retrieve your comprehensive evaluation and scorecard.",
+                content: welcome,
                 time: getFormattedTime()
               }
             ]);
+            if (isVoiceMode) {
+              speakText(welcome);
+            }
             setCurrentQuestionIndex(nextIndex);
           }
         }, 1500);
@@ -192,6 +317,13 @@ export function MockInterviewView() {
   };
 
   const handleEvaluateSession = async () => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (isListening) {
+      stopSpeechRecognition();
+    }
+
     setSessionState("score");
     setIsEvaluating(true);
     try {
@@ -309,6 +441,27 @@ export function MockInterviewView() {
                   ))}
                 </div>
               </div>
+
+              {/* Audio and Voice settings */}
+              <div className="space-y-1.5 pt-2">
+                <label className="text-xs font-bold text-ink/80 flex items-center gap-1.5">
+                  <Volume2 size={14} className="text-moss" /> Audio Settings
+                </label>
+                <button
+                  onClick={() => setIsVoiceMode(!isVoiceMode)}
+                  className={`flex w-full h-10 items-center justify-between rounded-lg border px-3.5 text-xs font-semibold transition cursor-pointer ${
+                    isVoiceMode
+                      ? "border-moss bg-mint text-moss"
+                      : "border-line bg-shell/30 text-ink/75 hover:bg-shell"
+                  }`}
+                  type="button"
+                >
+                  <span>Voice Interactive Mode (AI Speaks & Listens)</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${isVoiceMode ? "bg-moss text-shell" : "bg-ink/10 text-ink/50"}`}>
+                    {isVoiceMode ? "ACTIVE" : "OFF"}
+                  </span>
+                </button>
+              </div>
             </div>
 
             <div className="rounded-xl bg-shell/50 border border-line/60 p-4 space-y-4">
@@ -319,6 +472,7 @@ export function MockInterviewView() {
                 <p>• You will face <strong>{activeQuestions.length} core questions</strong> related to the selected track.</p>
                 <p>• Provide structured responses as you would in a real live interview.</p>
                 <p>• The AI interviewer adapts dynamic feedback based on your points.</p>
+                <p>• {isVoiceMode ? "AI will read questions out loud. Click the Mic icon on chat screen to dictate your reply." : "Type your technical answers into the input field."}</p>
                 <p>• Click <strong>"End and Evaluate"</strong> at any time to calculate scores early.</p>
               </div>
             </div>
@@ -371,18 +525,59 @@ export function MockInterviewView() {
 
           {/* Controls footer */}
           <div className="border-t border-line pt-3 flex flex-col gap-3">
+            {speechError && (
+              <p className="text-[11px] text-coral font-bold">{speechError}</p>
+            )}
+
             <form onSubmit={handleSendMessage} className="flex gap-2">
               <input
                 className="h-11 min-w-0 flex-1 rounded-lg border border-line bg-shell/20 px-3.5 text-xs outline-none focus:border-moss"
-                placeholder={currentQuestionIndex >= activeQuestions.length ? "Interview finished." : "Type your technical response here..."}
+                placeholder={
+                  isListening
+                    ? "Speech recognition active... Speak now."
+                    : currentQuestionIndex >= activeQuestions.length
+                    ? "Interview finished."
+                    : "Type technical response..."
+                }
                 value={inputVal}
                 onChange={(e) => setInputVal(e.target.value)}
                 disabled={currentQuestionIndex >= activeQuestions.length || isTyping}
               />
+
+              {isVoiceMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const lastMsg = messages[messages.length - 1];
+                    if (lastMsg) speakText(lastMsg.content);
+                  }}
+                  className="grid size-11 place-items-center rounded-lg border border-line bg-panel text-ink hover:bg-shell transition shrink-0 cursor-pointer"
+                  title="Replay question out loud"
+                >
+                  <Volume2 size={18} />
+                </button>
+              )}
+
+              {isVoiceMode && (
+                <button
+                  type="button"
+                  onClick={toggleListening}
+                  disabled={currentQuestionIndex >= activeQuestions.length || isTyping}
+                  className={`grid size-11 place-items-center rounded-lg border transition shrink-0 cursor-pointer ${
+                    isListening
+                      ? "bg-coral border-coral text-shell animate-pulse"
+                      : "bg-panel border-line text-ink hover:bg-shell"
+                  }`}
+                  title={isListening ? "Stop listening" : "Start dictating response"}
+                >
+                  <Mic size={18} className={isListening ? "animate-pulse" : ""} />
+                </button>
+              )}
+
               <button
                 type="submit"
                 disabled={currentQuestionIndex >= activeQuestions.length || isTyping || !inputVal.trim()}
-                className="grid size-11 place-items-center rounded-lg bg-ink text-shell hover:bg-moss transition disabled:opacity-50 shrink-0"
+                className="grid size-11 place-items-center rounded-lg bg-ink text-shell hover:bg-moss transition disabled:opacity-50 shrink-0 cursor-pointer"
                 aria-label="Send Answer"
               >
                 <Send size={16} />
@@ -401,7 +596,7 @@ export function MockInterviewView() {
               <button
                 onClick={handleEvaluateSession}
                 disabled={isEvaluating}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-coral px-4 text-xs font-semibold text-shell hover:bg-ink transition disabled:opacity-50"
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-coral px-4 text-xs font-semibold text-shell hover:bg-ink transition disabled:opacity-50 cursor-pointer"
                 type="button"
               >
                 {isEvaluating ? (
@@ -505,7 +700,7 @@ export function MockInterviewView() {
           <div className="flex gap-3 mt-6 border-t border-line pt-4">
             <button
               onClick={() => setSessionState("setup")}
-              className="flex-1 flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-xs font-semibold text-ink hover:bg-shell transition"
+              className="flex-1 flex h-11 items-center justify-center gap-1.5 rounded-lg border border-line bg-panel text-xs font-semibold text-ink hover:bg-shell transition cursor-pointer"
               type="button"
             >
               <RefreshCw size={13} />
@@ -513,7 +708,7 @@ export function MockInterviewView() {
             </button>
             <button
               onClick={handleStartSession}
-              className="flex-1 flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink text-xs font-semibold text-shell hover:bg-moss transition"
+              className="flex-1 flex h-11 items-center justify-center gap-1.5 rounded-lg bg-ink text-xs font-semibold text-shell hover:bg-moss transition cursor-pointer"
               type="button"
             >
               Restart This Track
