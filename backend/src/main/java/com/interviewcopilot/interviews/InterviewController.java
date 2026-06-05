@@ -1,12 +1,20 @@
 package com.interviewcopilot.interviews;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.interviewcopilot.users.User;
+import com.interviewcopilot.users.UserRepository;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -14,37 +22,95 @@ import java.util.UUID;
 @CrossOrigin(origins = "*")
 public class InterviewController {
 
+    private final InterviewService interviewService;
+    private final UserRepository userRepository;
+    private final ObjectMapper objectMapper;
+
+    public InterviewController(InterviewService interviewService, UserRepository userRepository) {
+        this.interviewService = interviewService;
+        this.userRepository = userRepository;
+        this.objectMapper = new ObjectMapper();
+    }
+
     @PostMapping("/start")
     public ResponseEntity<?> startSession(@Valid @RequestBody StartSessionRequest request) {
-        UUID mockSessionId = UUID.randomUUID();
+        // Retrieve authenticated user
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        
+        User user;
+        if (userOpt.isPresent()) {
+            user = userOpt.get();
+        } else {
+            // Fallback to request userId if auth fails or is mock
+            user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        }
+
+        InterviewSession session = interviewService.startSession(
+                user,
+                request.getCategory(),
+                request.getDifficulty() != null ? request.getDifficulty() : "Senior",
+                request.getInterviewerStyle()
+        );
+
+        // Fetch the generated first question (from message table)
+        List<InterviewMessage> messages = interviewService.getMessages(session.getId());
+        String firstQuestion = messages.isEmpty() ? "Welcome! Let's start." : messages.get(0).getContent();
+
         return ResponseEntity.ok(Map.of(
-                "id", mockSessionId,
-                "category", request.getCategory(),
-                "interviewerStyle", request.getInterviewerStyle(),
-                "firstQuestion", "Explain how you would avoid N+1 queries in a Spring Boot service."
+                "id", session.getId(),
+                "category", session.getCategory(),
+                "difficulty", session.getDifficulty(),
+                "interviewerStyle", session.getDemeanor(),
+                "firstQuestion", firstQuestion
         ));
     }
 
     @PostMapping("/{id}/messages")
     public ResponseEntity<?> sendMessage(@PathVariable UUID id, @Valid @RequestBody MessageRequest request) {
-        String aiResponse = "Interesting points. Can you detail how you would handle connection pooling or caching for that scenario?";
-        return ResponseEntity.ok(Map.of(
-                "sessionId", id,
-                "role", "AI",
-                "content", aiResponse
-        ));
+        try {
+            InterviewMessage aiResponse = interviewService.handleUserResponse(id, request.getContent());
+            return ResponseEntity.ok(Map.of(
+                    "sessionId", id,
+                    "role", "AI",
+                    "content", aiResponse.getContent()
+            ));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+        }
+    }
+
+    @PostMapping("/{id}/evaluate")
+    public ResponseEntity<?> evaluateSession(@PathVariable UUID id) {
+        try {
+            String evaluationJson = interviewService.evaluateSession(id);
+            return ResponseEntity.ok(objectMapper.readTree(evaluationJson));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Evaluation failed: " + e.getMessage());
+        }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getSession(@PathVariable UUID id) {
+        InterviewSession session = interviewService.getSession(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+        
+        List<InterviewMessage> messages = interviewService.getMessages(id);
+        List<Map<String, String>> mappedMessages = messages.stream().map(m -> Map.of(
+                "role", m.getRole(),
+                "content", m.getContent()
+        )).toList();
+
         return ResponseEntity.ok(Map.of(
-                "id", id,
-                "category", "Spring Boot",
-                "score", 8,
-                "messages", List.of(
-                        Map.of("role", "AI", "content", "How do you handle N+1 select loops?"),
-                        Map.of("role", "USER", "content", "Using FetchJoins or EntityGraphs.")
-                )
+                "id", session.getId(),
+                "category", session.getCategory(),
+                "difficulty", session.getDifficulty(),
+                "interviewerStyle", session.getDemeanor(),
+                "score", session.getScore() != null ? session.getScore() : 0,
+                "evaluationJson", session.getEvaluationJson() != null ? session.getEvaluationJson() : "",
+                "messages", mappedMessages
         ));
     }
 
@@ -55,6 +121,8 @@ public class InterviewController {
         private String category;
         @NotBlank
         private String interviewerStyle;
+        
+        private String difficulty;
 
         public UUID getUserId() { return userId; }
         public void setUserId(UUID userId) { this.userId = userId; }
@@ -64,6 +132,9 @@ public class InterviewController {
 
         public String getInterviewerStyle() { return interviewerStyle; }
         public void setInterviewerStyle(String interviewerStyle) { this.interviewerStyle = interviewerStyle; }
+
+        public String getDifficulty() { return difficulty; }
+        public void setDifficulty(String difficulty) { this.difficulty = difficulty; }
     }
 
     public static class MessageRequest {

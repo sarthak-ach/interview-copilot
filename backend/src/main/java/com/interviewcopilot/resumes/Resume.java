@@ -28,20 +28,27 @@ public class Resume {
     @Column(name = "uploaded_at", nullable = false)
     private LocalDateTime uploadedAt;
 
+    @Column(nullable = false)
+    private String status = "PENDING";
+
     public Resume() {
     }
 
-    public Resume(UUID id, User user, String fileUrl, String parsedContent, LocalDateTime uploadedAt) {
+    public Resume(UUID id, User user, String fileUrl, String parsedContent, LocalDateTime uploadedAt, String status) {
         this.id = id;
         this.user = user;
         this.fileUrl = fileUrl;
         this.parsedContent = parsedContent;
         this.uploadedAt = uploadedAt;
+        this.status = status;
     }
 
     @PrePersist
     protected void onCreate() {
         this.uploadedAt = LocalDateTime.now();
+        if (this.status == null) {
+            this.status = "PENDING";
+        }
     }
 
     // Getters and Setters
@@ -59,4 +66,7 @@ public class Resume {
 
     public LocalDateTime getUploadedAt() { return uploadedAt; }
     public void setUploadedAt(LocalDateTime uploadedAt) { this.uploadedAt = uploadedAt; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }

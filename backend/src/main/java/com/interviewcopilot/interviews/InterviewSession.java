@@ -22,7 +22,14 @@ public class InterviewSession {
     @Column(nullable = false)
     private String category;
 
+    private String difficulty;
+
+    private String demeanor;
+
     private Integer score;
+
+    @Column(name = "evaluation_json", columnDefinition = "TEXT")
+    private String evaluationJson;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -30,11 +37,14 @@ public class InterviewSession {
     public InterviewSession() {
     }
 
-    public InterviewSession(UUID id, User user, String category, Integer score, LocalDateTime createdAt) {
+    public InterviewSession(UUID id, User user, String category, String difficulty, String demeanor, Integer score, String evaluationJson, LocalDateTime createdAt) {
         this.id = id;
         this.user = user;
         this.category = category;
+        this.difficulty = difficulty;
+        this.demeanor = demeanor;
         this.score = score;
+        this.evaluationJson = evaluationJson;
         this.createdAt = createdAt;
     }
 
@@ -53,8 +63,17 @@ public class InterviewSession {
     public String getCategory() { return category; }
     public void setCategory(String category) { this.category = category; }
 
+    public String getDifficulty() { return difficulty; }
+    public void setDifficulty(String difficulty) { this.difficulty = difficulty; }
+
+    public String getDemeanor() { return demeanor; }
+    public void setDemeanor(String demeanor) { this.demeanor = demeanor; }
+
     public Integer getScore() { return score; }
     public void setScore(Integer score) { this.score = score; }
+
+    public String getEvaluationJson() { return evaluationJson; }
+    public void setEvaluationJson(String evaluationJson) { this.evaluationJson = evaluationJson; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

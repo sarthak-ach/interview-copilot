@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Info
 } from "lucide-react";
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@/components/AuthContext";
 
 type Message = {
   role: "AI" | "user";
@@ -62,6 +64,7 @@ const tracks: Record<string, TrackQuestions> = {
 };
 
 export function MockInterviewView() {
+  const { user } = useAuth();
   const [sessionState, setSessionState] = useState<"setup" | "chat" | "score">("setup");
   const [selectedTrack, setSelectedTrack] = useState<string>("Spring Boot");
   const [difficulty, setDifficulty] = useState<string>("Senior");
@@ -73,6 +76,11 @@ export function MockInterviewView() {
   const [isTyping, setIsTyping] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isStarting, setIsStarting] = useState<boolean>(false);
+  const [evaluation, setEvaluation] = useState<any>(null);
+  const [isEvaluating, setIsEvaluating] = useState<boolean>(false);
+
   const activeQuestions = tracks[selectedTrack]?.questions || [];
   const activeFeedbacks = tracks[selectedTrack]?.feedbacks || [];
 
@@ -81,20 +89,46 @@ export function MockInterviewView() {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const handleStartSession = () => {
-    setSessionState("chat");
-    setCurrentQuestionIndex(0);
-    const initialQuestion = activeQuestions[0];
-    setMessages([
-      {
-        role: "AI",
-        content: `Welcome to your mock interview on the ${selectedTrack} track. My role is to evaluate your answers and guide you. Let's begin with the first question:\n\n"${initialQuestion}"`,
-        time: getFormattedTime()
-      }
-    ]);
+  const handleStartSession = async () => {
+    setIsStarting(true);
+    try {
+      const data = await apiFetch("/api/interviews/start", {
+        method: "POST",
+        bodyData: {
+          userId: user?.id || "00000000-0000-0000-0000-000000000000",
+          category: selectedTrack,
+          difficulty: difficulty,
+          interviewerStyle: interviewerStyle
+        }
+      });
+      setSessionId(data.id);
+      setMessages([
+        {
+          role: "AI",
+          content: `Welcome to your mock interview on the ${selectedTrack} track at ${difficulty} level. My role is to evaluate your answers. Let's begin with the first question:\n\n"${data.firstQuestion}"`,
+          time: getFormattedTime()
+        }
+      ]);
+      setCurrentQuestionIndex(0);
+      setSessionState("chat");
+    } catch (err) {
+      console.error("Failed to start session:", err);
+      // Fallback local start
+      setSessionId(null);
+      setMessages([
+        {
+          role: "AI",
+          content: `Welcome to your mock interview (offline fallback). Let's begin with the first question:\n\n"${activeQuestions[0]}"`,
+          time: getFormattedTime()
+        }
+      ]);
+      setSessionState("chat");
+    } finally {
+      setIsStarting(false);
+    }
   };
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputVal.trim() || isTyping) return;
 
@@ -105,37 +139,89 @@ export function MockInterviewView() {
     setMessages(prev => [...prev, { role: "user", content: userText, time: getFormattedTime() }]);
     setIsTyping(true);
 
-    setTimeout(() => {
-      setIsTyping(false);
-      const nextIndex = currentQuestionIndex + 1;
-      
-      if (nextIndex < activeQuestions.length) {
-        // Retrieve transition feedback and next question
-        const feedback = activeFeedbacks[currentQuestionIndex];
-        const nextQuestion = activeQuestions[nextIndex];
-        
+    try {
+      if (sessionId) {
+        const data = await apiFetch(`/api/interviews/${sessionId}/messages`, {
+          method: "POST",
+          bodyData: { content: userText }
+        });
         setMessages(prev => [
           ...prev,
           {
             role: "AI",
-            content: `${feedback}\n\nHere is the next question:\n\n"${nextQuestion}"`,
+            content: data.content,
             time: getFormattedTime()
           }
         ]);
-        setCurrentQuestionIndex(nextIndex);
+        setCurrentQuestionIndex(prev => prev + 1);
       } else {
-        // Finished all questions
-        setMessages(prev => [
-          ...prev,
-          {
-            role: "AI",
-            content: "Excellent response! That completes all questions in this session. Click the button below to retrieve your comprehensive evaluation and scorecard.",
-            time: getFormattedTime()
+        // Fallback offline progression
+        setTimeout(() => {
+          setIsTyping(false);
+          const nextIndex = currentQuestionIndex + 1;
+          if (nextIndex < activeQuestions.length) {
+            const feedback = activeFeedbacks[currentQuestionIndex];
+            const nextQuestion = activeQuestions[nextIndex];
+            setMessages(prev => [
+              ...prev,
+              {
+                role: "AI",
+                content: `${feedback}\n\nHere is the next question:\n\n"${nextQuestion}"`,
+                time: getFormattedTime()
+              }
+            ]);
+            setCurrentQuestionIndex(nextIndex);
+          } else {
+            setMessages(prev => [
+              ...prev,
+              {
+                role: "AI",
+                content: "Excellent response! That completes all questions in this session. Click the button below to retrieve your comprehensive evaluation and scorecard.",
+                time: getFormattedTime()
+              }
+            ]);
+            setCurrentQuestionIndex(nextIndex);
           }
-        ]);
-        setCurrentQuestionIndex(nextIndex);
+        }, 1500);
       }
-    }, 1500);
+    } catch (err) {
+      console.error("Failed to send message:", err);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const handleEvaluateSession = async () => {
+    setSessionState("score");
+    setIsEvaluating(true);
+    try {
+      if (sessionId) {
+        const evalData = await apiFetch(`/api/interviews/${sessionId}/evaluate`, {
+          method: "POST"
+        });
+        setEvaluation(evalData);
+      } else {
+        // Mock fallback evaluation
+        setEvaluation({
+          overallScore: 8.4,
+          clarityScore: 8.5,
+          fluencyScore: 9.0,
+          concurrencyScore: 7.8,
+          keyStrengths: [
+            "Clear understanding of N+1 select patterns and resolution methods.",
+            "Good layout of transactional annotation behaviors and proxy patterns."
+          ],
+          areasForGrowth: [
+            "Ensure to touch upon write bottlenecks when choosing locking mechanisms.",
+            "Could provide more details on transaction isolation levels."
+          ]
+        });
+      }
+    } catch (err) {
+      console.error("Evaluation failed:", err);
+    } finally {
+      setIsEvaluating(false);
+    }
   };
 
   useEffect(() => {
@@ -240,11 +326,12 @@ export function MockInterviewView() {
 
           <button
             onClick={handleStartSession}
-            className="flex w-full h-11 items-center justify-center gap-2 rounded-lg bg-ink text-shell text-sm font-semibold transition hover:bg-moss mt-6"
+            disabled={isStarting}
+            className="flex w-full h-11 items-center justify-center gap-2 rounded-lg bg-ink text-shell text-sm font-semibold transition hover:bg-moss mt-6 disabled:opacity-50"
             type="button"
           >
-            Start Practice Round
-            <Mic size={16} />
+            {isStarting ? "Initializing..." : "Start Practice Round"}
+            {isStarting ? <Loader2 className="animate-spin" size={16} /> : <Mic size={16} />}
           </button>
         </div>
       )}
@@ -312,12 +399,22 @@ export function MockInterviewView() {
               </button>
 
               <button
-                onClick={() => setSessionState("score")}
-                className="flex h-9 items-center gap-1.5 rounded-lg bg-coral px-4 text-xs font-semibold text-shell hover:bg-ink transition"
+                onClick={handleEvaluateSession}
+                disabled={isEvaluating}
+                className="flex h-9 items-center gap-1.5 rounded-lg bg-coral px-4 text-xs font-semibold text-shell hover:bg-ink transition disabled:opacity-50"
                 type="button"
               >
-                {currentQuestionIndex >= activeQuestions.length ? "Proceed to Evaluation" : "End & Evaluate"}
-                <ChevronRight size={14} />
+                {isEvaluating ? (
+                  <>
+                    Evaluating...
+                    <Loader2 size={14} className="animate-spin" />
+                  </>
+                ) : (
+                  <>
+                    {currentQuestionIndex >= 3 ? "Proceed to Evaluation" : "End & Evaluate"}
+                    <ChevronRight size={14} />
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -327,70 +424,83 @@ export function MockInterviewView() {
       {/* Screen 3: SCORECARD SUMMARY */}
       {sessionState === "score" && (
         <div className="flex-1 flex flex-col justify-between">
-          <div className="space-y-5 py-2">
-            {/* Score ring */}
-            <div className="flex items-center gap-4 bg-shell/60 p-5 border border-line/40 rounded-xl">
-              <div className="grid size-14 place-items-center rounded-full bg-mint text-moss shrink-0">
-                <Award size={28} />
+          {isEvaluating ? (
+            <div className="flex flex-col items-center justify-center py-20 space-y-3">
+              <Loader2 className="animate-spin text-moss" size={32} />
+              <p className="text-sm font-semibold text-ink/70">Analyzing answers & compiling scorecard...</p>
+            </div>
+          ) : evaluation ? (
+            <div className="space-y-5 py-2">
+              {/* Score ring */}
+              <div className="flex items-center gap-4 bg-shell/60 p-5 border border-line/40 rounded-xl">
+                <div className="grid size-14 place-items-center rounded-full bg-mint text-moss shrink-0">
+                  <Award size={28} />
+                </div>
+                <div>
+                  <p className="text-xs text-moss font-semibold uppercase">Overall Session Performance</p>
+                  <h5 className="text-3xl font-extrabold text-ink">{evaluation.overallScore} / 10</h5>
+                </div>
+                <div className="ml-auto text-right text-xs">
+                  <span className="rounded bg-moss/10 px-2 py-1 text-moss font-bold">
+                    {evaluation.overallScore >= 7 ? "Passed" : "Needs Practice"}
+                  </span>
+                  <p className="mt-1 text-ink/50 text-[10px]">Track: {selectedTrack}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-xs text-moss font-semibold uppercase">Overall Session Performance</p>
-                <h5 className="text-3xl font-extrabold text-ink">8.4 / 10</h5>
+
+              {/* Categorized rating list */}
+              <div className="space-y-3.5">
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span>Explanation Clarity</span>
+                    <span>{evaluation.clarityScore} / 10</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
+                    <div className="h-full bg-moss" style={{ width: `${evaluation.clarityScore * 10}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span>Framework API Fluency</span>
+                    <span>{evaluation.fluencyScore} / 10</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
+                    <div className="h-full bg-moss" style={{ width: `${evaluation.fluencyScore * 10}%` }} />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs font-semibold mb-1">
+                    <span>Concurrency & Tuning Principles</span>
+                    <span>{evaluation.concurrencyScore} / 10</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
+                    <div className="h-full bg-gold" style={{ width: `${evaluation.concurrencyScore * 10}%` }} />
+                  </div>
+                </div>
               </div>
-              <div className="ml-auto text-right text-xs">
-                <span className="rounded bg-moss/10 px-2 py-1 text-moss font-bold">Passed</span>
-                <p className="mt-1 text-ink/50 text-[10px]">Track: {selectedTrack}</p>
+
+              {/* Highlights bullet boxes */}
+              <div className="grid gap-4 sm:grid-cols-2 pt-2">
+                <div className="rounded-lg bg-mint/45 border border-mint/60 p-3 space-y-1.5">
+                  <span className="text-xs font-bold text-moss uppercase block mb-1">Key Strengths</span>
+                  {evaluation.keyStrengths?.map((str: string, idx: number) => (
+                    <p key={idx} className="text-xs text-ink/80">• {str}</p>
+                  ))}
+                </div>
+
+                <div className="rounded-lg bg-coral/5 border border-coral/10 p-3 space-y-1.5">
+                  <span className="text-xs font-bold text-coral uppercase block mb-1">Areas for Growth</span>
+                  {evaluation.areasForGrowth?.map((str: string, idx: number) => (
+                    <p key={idx} className="text-xs text-ink/80">• {str}</p>
+                  ))}
+                </div>
               </div>
             </div>
-
-            {/* Categorized rating list */}
-            <div className="space-y-3.5">
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Explanation Clarity</span>
-                  <span>8.5 / 10</span>
-                </div>
-                <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
-                  <div className="h-full bg-moss" style={{ width: "85%" }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Framework API Fluency</span>
-                  <span>9.0 / 10</span>
-                </div>
-                <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
-                  <div className="h-full bg-moss" style={{ width: "90%" }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-semibold mb-1">
-                  <span>Concurrency & Tuning Principles</span>
-                  <span>7.8 / 10</span>
-                </div>
-                <div className="h-2 rounded-full bg-ink/10 overflow-hidden">
-                  <div className="h-full bg-gold" style={{ width: "78%" }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Highlights bullet boxes */}
-            <div className="grid gap-4 sm:grid-cols-2 pt-2">
-              <div className="rounded-lg bg-mint/45 border border-mint/60 p-3 space-y-1.5">
-                <span className="text-xs font-bold text-moss uppercase block mb-1">Key Strengths</span>
-                <p className="text-xs text-ink/80">• Clear understanding of N+1 select patterns and resolution methods.</p>
-                <p className="text-xs text-ink/80">• Good layout of transactional annotation behaviors and proxy patterns.</p>
-              </div>
-
-              <div className="rounded-lg bg-coral/5 border border-coral/10 p-3 space-y-1.5">
-                <span className="text-xs font-bold text-coral uppercase block mb-1">Areas for Growth</span>
-                <p className="text-xs text-ink/80">• Ensure to touch upon write bottlenecks when choosing locking mechanisms.</p>
-                <p className="text-xs text-ink/80">• Could provide more details on transaction isolation levels.</p>
-              </div>
-            </div>
-          </div>
+          ) : (
+            <div className="text-center text-xs text-ink/50 py-10">No evaluation found.</div>
+          )}
 
           <div className="flex gap-3 mt-6 border-t border-line pt-4">
             <button

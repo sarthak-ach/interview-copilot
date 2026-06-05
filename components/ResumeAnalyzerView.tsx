@@ -39,6 +39,31 @@ export function ResumeAnalyzerView() {
     }
   }, [user?.id]);
 
+  // Silently poll the resume list if there's a pending or processing item
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+    
+    const hasPendingOrProcessing = resumes.some(
+      (r) => r.status === "PENDING" || r.status === "PROCESSING"
+    );
+    
+    if (hasPendingOrProcessing && user?.id) {
+      intervalId = setInterval(async () => {
+        await fetchResumes(user.id, undefined, true);
+      }, 2000);
+    }
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [resumes, user?.id, fetchResumes]);
+
+  const selectedResume = resumes.find(r => r.id === selectedResumeId);
+  const isProcessing = selectedResume && (selectedResume.status === "PENDING" || selectedResume.status === "PROCESSING");
+  const isFailed = selectedResume && selectedResume.status === "FAILED";
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
   };
@@ -132,9 +157,20 @@ export function ResumeAnalyzerView() {
                       <span className="truncate flex-grow mr-2">{r.filename}</span>
                     </button>
                     <div className="flex items-center gap-2 shrink-0 ml-1">
-                      <span className="text-[10px] bg-ink/5 px-1.5 py-0.5 rounded font-mono text-ink/60">
-                        {r.score}%
-                      </span>
+                      {r.status === "PENDING" || r.status === "PROCESSING" ? (
+                        <span className="text-[10px] bg-gold/10 text-gold px-1.5 py-0.5 rounded font-medium flex items-center gap-1 animate-pulse">
+                          <Loader2 className="size-2.5 animate-spin" />
+                          Processing
+                        </span>
+                      ) : r.status === "FAILED" ? (
+                        <span className="text-[10px] bg-coral/10 text-coral px-1.5 py-0.5 rounded font-medium">
+                          Failed
+                        </span>
+                      ) : (
+                        <span className="text-[10px] bg-ink/5 px-1.5 py-0.5 rounded font-mono text-ink/60">
+                          {r.score}%
+                        </span>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -163,11 +199,25 @@ export function ResumeAnalyzerView() {
       )}
 
       {/* Main Analysis Results */}
-      {isLoadingReview || isUploading ? (
-        <div className="rounded-xl border border-line bg-panel p-8 text-center animate-pulse">
-          <Loader2 className="size-8 animate-spin text-moss mx-auto mb-4" />
-          <div className="h-6 w-32 bg-ink/10 rounded mx-auto mb-4"></div>
-          <div className="h-4 w-64 bg-ink/10 rounded mx-auto"></div>
+      {isLoadingReview || isUploading || isProcessing ? (
+        <div className="rounded-xl border border-line bg-panel p-8 text-center shadow-soft flex flex-col items-center justify-center min-h-[240px]">
+          <Loader2 className="size-10 animate-spin text-moss mb-4" />
+          <h4 className="font-semibold text-ink text-sm">
+            {isProcessing ? "Analyzing Resume Details" : "Loading Review Details"}
+          </h4>
+          <p className="text-xs text-ink/50 mt-1 max-w-sm mx-auto">
+            {isProcessing 
+              ? `Gemini AI is parsing and evaluating "${selectedResume?.filename}". This typically takes 10-15 seconds.` 
+              : "Fetching ATS alignment, keyword matching, and bullet suggestions..."}
+          </p>
+        </div>
+      ) : isFailed ? (
+        <div className="rounded-xl border border-line bg-panel p-8 text-center shadow-soft py-12">
+          <AlertCircle size={48} className="text-coral mx-auto mb-4" />
+          <h4 className="font-semibold text-coral text-sm">Analysis Failed</h4>
+          <p className="text-xs text-ink/50 mt-1 max-w-md mx-auto">
+            Gemini AI was unable to parse or analyze this resume. Please ensure the file is not corrupted and try uploading again.
+          </p>
         </div>
       ) : !activeReview ? (
         <div className="rounded-xl border border-line bg-panel p-8 text-center shadow-soft">

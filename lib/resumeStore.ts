@@ -19,18 +19,20 @@ export type ResumeListItem = {
   filename: string;
   score: number;
   uploadedAt: string;
+  status: string;
 };
 
 interface ResumeState {
   resumes: ResumeListItem[];
   selectedResumeId: string | null;
+  loadedReviewResumeId: string | null;
   activeReview: ResumeData | null;
   isUploading: boolean;
   isLoadingList: boolean;
   isLoadingReview: boolean;
   errorMsg: string | null;
 
-  fetchResumes: (userId: string, selectNewId?: string) => Promise<void>;
+  fetchResumes: (userId: string, selectNewId?: string, silent?: boolean) => Promise<void>;
   fetchReview: (resumeId: string) => Promise<void>;
   setSelectedResumeId: (id: string | null) => Promise<void>;
   uploadResume: (file: File, userId: string) => Promise<void>;
@@ -41,14 +43,17 @@ interface ResumeState {
 export const useResumeStore = create<ResumeState>((set, get) => ({
   resumes: [],
   selectedResumeId: null,
+  loadedReviewResumeId: null,
   activeReview: null,
   isUploading: false,
   isLoadingList: false,
   isLoadingReview: false,
   errorMsg: null,
 
-  fetchResumes: async (userId: string, selectNewId?: string) => {
-    set({ isLoadingList: true, errorMsg: null });
+  fetchResumes: async (userId: string, selectNewId?: string, silent?: boolean) => {
+    if (!silent) {
+      set({ isLoadingList: true, errorMsg: null });
+    }
     try {
       const data = await apiFetch<ResumeListItem[]>(`/api/resumes?userId=${userId}`);
       set({ resumes: data });
@@ -58,15 +63,27 @@ export const useResumeStore = create<ResumeState>((set, get) => ({
         const targetId = selectNewId || (currentSelectedId && data.some(r => r.id === currentSelectedId) ? currentSelectedId : data[0].id);
         
         set({ selectedResumeId: targetId });
-        await get().fetchReview(targetId);
+        
+        const selectedResume = data.find(r => r.id === targetId);
+        if (selectedResume && selectedResume.status === "COMPLETED") {
+          if (get().loadedReviewResumeId !== targetId) {
+            await get().fetchReview(targetId);
+          }
+        } else {
+          set({ activeReview: null, loadedReviewResumeId: null });
+        }
       } else {
-        set({ selectedResumeId: null, activeReview: null });
+        set({ selectedResumeId: null, loadedReviewResumeId: null, activeReview: null });
       }
     } catch (err: any) {
       console.error("Error fetching resumes in store:", err);
-      set({ errorMsg: "Failed to load resumes. Make sure the backend is running." });
+      if (!silent) {
+        set({ errorMsg: "Failed to load resumes. Make sure the backend is running." });
+      }
     } finally {
-      set({ isLoadingList: false });
+      if (!silent) {
+        set({ isLoadingList: false });
+      }
     }
   },
 
@@ -74,10 +91,10 @@ export const useResumeStore = create<ResumeState>((set, get) => ({
     set({ isLoadingReview: true, errorMsg: null });
     try {
       const data = await apiFetch<ResumeData>(`/api/resumes/${resumeId}/review`);
-      set({ activeReview: data });
+      set({ activeReview: data, loadedReviewResumeId: resumeId });
     } catch (err: any) {
       console.error("Error fetching review in store:", err);
-      set({ errorMsg: "Failed to load resume review details.", activeReview: null });
+      set({ errorMsg: "Failed to load resume review details.", activeReview: null, loadedReviewResumeId: null });
     } finally {
       set({ isLoadingReview: false });
     }
@@ -86,9 +103,14 @@ export const useResumeStore = create<ResumeState>((set, get) => ({
   setSelectedResumeId: async (id: string | null) => {
     set({ selectedResumeId: id });
     if (id) {
-      await get().fetchReview(id);
+      const selectedResume = get().resumes.find(r => r.id === id);
+      if (selectedResume && selectedResume.status === "COMPLETED") {
+        await get().fetchReview(id);
+      } else {
+        set({ activeReview: null, loadedReviewResumeId: null });
+      }
     } else {
-      set({ activeReview: null });
+      set({ activeReview: null, loadedReviewResumeId: null });
     }
   },
 
